@@ -47,60 +47,12 @@ await cluster.task(async ({ page, data: url }) => {
     async function getLinks(){
         try {
             return await page.evaluate(`(() => {                    
-                let produto = {}
-
-                    produto["url"] = window.location.href
-                    
-                if (document.querySelector('.heading-title') != null ) {
-                    produto["name"] = document.querySelector('.heading-title').innerHTML
-                } else {
-                    produto["name"] = ""
-                }
-                if (document.querySelector('.product-price') != null) {
-                    produto["price"] = document.querySelector('.product-price').innerHTML.replace('R$','')
-                } else {
-                    produto["price"] = ""
-                }
-                if (document.querySelector('.journal-stock') != null) {
-                    produto["stock"] = document.querySelector('.journal-stock').innerHTML
-                } else {
-                    produto["stock"] = ""
-                }
-                if (document.querySelector('.p-brand > a') != null) {
-                    produto["brand"] = document.querySelector('.p-brand > a').innerHTML
-                } else {
-                    produto["brand"] = ""
-                }
-                if (document.querySelector('#tab-description') != null) {
-                    produto["description"] = document.querySelector('#tab-description').innerText
-                } else {
-                    produto["description"] = ""
-                }
-                if (document.querySelector('.breadcrumb li:nth-last-of-type(3)') != null) {
-                    produto["Categoria"] = document.querySelector('.breadcrumb li:nth-last-of-type(3)').innerText
-                } else {
-                    produto["Categoria"] = ""
-                }
-                if (document.querySelector('.breadcrumb li:nth-last-of-type(2)') != null) {
-                    produto["subCategoria"] = document.querySelector('.breadcrumb li:nth-last-of-type(2)').innerText
-                } else {
-                    produto["subCategoria"] = ""
-                }
-
-                if (document.querySelector('#product-gallery') != null) {
-                    let images = document.querySelectorAll('.swiper-slide')
-
-                    for (let i = 0; i < images.length; i++) {
-                        if(images[i].getAttribute('href') != null) {
-                            produto['images'+i] = images[i].getAttribute('href')
-                        }
-                    }
-                }
-
-                if (document.querySelector('#product-gallery') == null) {
-                    if (document.querySelector('.product-info .image > a > img') != null) {
-                        produto["image"] = document.querySelector('.product-info .image > a > img').getAttribute('src')
-                    }              	
+                let produto = {
+                    name: document.querySelector('#content-inner h3').innerText,
+                    code: document.querySelector('#content-inner h5').innerText.replace('Código do produto: ', '').replace(' ', '-'),
+                    price: document.querySelector('#content-inner .price').innerText.replace('R$ ', '').trim(),
+                    description:  document.querySelector('#content-inner .descricao').innerText,
+                    type:  document.querySelector('#content-inner .tipo').innerText
                 }
 
                 return produto
@@ -127,16 +79,16 @@ await cluster.task(async ({ page, data: url }) => {
 
     // Salvamentos de Backup
     if(rowindex == 400) {
-        wb.write(__dirname + '/output/Produtos.xlsx');
+        wb.write(__dirname + '/Produtos.xlsx');
     }
     if(rowindex == 1000) {
-        wb.write(__dirname + '/output/Produtos.xlsx');
+        wb.write(__dirname + '/Produtos.xlsx');
     }
     if(rowindex == 1500) {
-        wb.write(__dirname + '/output/Produtos.xlsx');
+        wb.write(__dirname + '/Produtos.xlsx');
     }
     if(rowindex == 2000) {
-        wb.write(__dirname + '/output/Produtos.xlsx');
+        wb.write(__dirname + '/Produtos.xlsx');
     } 
 
     // Incrementando Barra de Progresso
@@ -152,10 +104,11 @@ await cluster.task(async ({ page, data: url }) => {
 
     // Terminando Fila
     await cluster.idle();
-    // Fechando Cluster
+    wb.write(__dirname + '/ProdutosFinal.xlsx');
+    // Fechando Cluster1
     await cluster.close();
     // Salvando Planilha Final
-    wb.write(__dirname + '/Produtos.xlsx');
+    
     // Parando Barra de Progresso
     bar1.stop();
     // Fechando Aplicação
