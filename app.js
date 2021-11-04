@@ -2,7 +2,7 @@
 const puppeteer = require('puppeteer')
 
 // Módulos para ler e gravar arquivos
-const fs = require('fs'), xl = require('excel4node'), wb = new xl.Workbook();
+const fs = require('fs');
 
 // Barra de progresso Dinâmica
 const cliProgress = require('cli-progress');
@@ -16,25 +16,29 @@ const bar1 = new cliProgress.SingleBar({
 }, cliProgress.Presets.shades_classic);
 
 // Lendo URLS
-const urls = JSON.parse(fs.readFileSync(__dirname + '/LINKS.txt', 'utf-8'));
+const urls = JSON.parse(fs.readFileSync(__dirname + '/LINKS.json', 'utf-8'));
+
+// Declarando Array de Resultados
+let arrayResults = [];
 
 // Iniciando Barra de Progresso
 bar1.start(urls.length, 0);
 
 // Declarando Array De Erros
-let errorArray = []
-
-// Declarando planilha para salvamento / Index atual da linha
-let ws = wb.addWorksheet('Produtos'), rowindex = 1;
+let errorArray = [];
 
 // Função Assíncrona para o Cluster
 (async () => {
     // Construindo Cluster
   const cluster = await Cluster.launch({
     concurrency: Cluster.CONCURRENCY_PAGE,
-    maxConcurrency: 4,
+    maxConcurrency: 12,
+    retryLimit: 6,
+    skipDuplicateUrls: true,
+    sameDomainDelay: 150,
+    skipDuplicateUrls: true,
     puppeteerOptions: {
-        headless: true
+        headless: false
     }
   });
  
@@ -43,20 +47,35 @@ await cluster.task(async ({ page, data: url }) => {
     // Direcionando para Url
     await page.goto(url);
 
+    // Scrollar Para Baixo
+    await autoScroll(page);
+
+    // Função Para Scrollar Para Baixo
+    async function autoScroll(page){
+        await page.evaluate(async () => {
+            await new Promise((resolve, reject) => {
+                var totalHeight = 0;
+                var distance = 100;
+                var timer = setInterval(() => {
+                    var scrollHeight = document.body.scrollHeight;
+                    window.scrollBy(0, distance);
+                    totalHeight += distance;
+    
+                    if(totalHeight >= scrollHeight){
+                        clearInterval(timer);
+                        resolve();
+                    }
+                }, 100);
+            });
+        });
+    }
+
     // Extraindo Dados
     async function getLinks(){
         try {
-            return await page.evaluate(`(() => {                    
-                let produto = {
-                    name: document.querySelector('#content-inner h3').innerText,
-                    code: document.querySelector('#content-inner h5').innerText.replace('Código do produto: ', '').replace(' ', '-'),
-                    price: document.querySelector('#content-inner .price').innerText.replace('R$ ', '').trim(),
-                    description:  document.querySelector('#content-inner .descricao').innerText,
-                    type:  document.querySelector('#content-inner .tipo').innerText
-                }
-
-                return produto
-            })()`);
+            return await page.evaluate(`(()=>{
+                
+            })();`)
         } catch (err) {
             // Declarando Erro
             errorArray.push(url)
@@ -65,55 +84,40 @@ await cluster.task(async ({ page, data: url }) => {
             console.log(err)
             return err
         }
-    };
+    }
 
     // Declarando Váriavel de Dados
     let data = await getLinks();
 
     // Gravando Dados Na Planilha
-    let columnindex = 1;
-    Object.keys(data).forEach(columnName => {
-        ws.cell(rowindex, columnindex++).string(data[columnName]);
-    })
-    rowindex++;
+    console.log(data)
+    if (data != '' && data) {
+       arrayResults.push(data)
+    }
 
-    // Salvamentos de Backup
-    if(rowindex == 400) {
-        wb.write(__dirname + '/Produtos.xlsx');
-    }
-    if(rowindex == 1000) {
-        wb.write(__dirname + '/Produtos.xlsx');
-    }
-    if(rowindex == 1500) {
-        wb.write(__dirname + '/Produtos.xlsx');
-    }
-    if(rowindex == 2000) {
-        wb.write(__dirname + '/Produtos.xlsx');
-    } 
+    // Salvando Backups
+    fs.writeFileSync(__dirname + '/ProdutosBackup.json', JSON.stringify(arrayResults))
 
     // Incrementando Barra de Progresso
     bar1.increment(1)
     return
     });
 
-
     // Declarando Fila de URLS
-    urls.forEach(url => {
-        cluster.queue(url);
-    })
+    urls.forEach(url => { cluster.queue(url) })
 
     // Terminando Fila
     await cluster.idle();
-    wb.write(__dirname + '/ProdutosFinal.xlsx');
+
+    // Salvando Dados Finais
+    fs.writeFileSync(__dirname + '/ProdutosFinal.json', JSON.stringify(arrayResults))
+    
     // Fechando Cluster1
     await cluster.close();
-    // Salvando Planilha Final
-    
+
     // Parando Barra de Progresso
     bar1.stop();
+
     // Fechando Aplicação
     process.exit()
-
-
-
 })();
